@@ -6,6 +6,111 @@ The **Outcome-Based Education (OBE) Management System** is a web-based platform 
 
 Instead of focusing only on marks and grades, the system measures whether students are actually achieving the expected **Course Outcomes (COs)** and **Program Outcomes (POs)** defined for their courses and degree program.
 
+## Version Roadmap
+
+| Version | Scope | Status |
+| --- | --- | --- |
+| **v1** | IT department only, runs locally, launched within 20 days | In progress |
+| **v2** | College-wide multi-department deployment, cloud hosting, report polish | Planned |
+| **v3 (Final Production)** | Production-grade, multi-tenant, high availability, monitoring, CI/CD, audit trail | Target |
+
+## Final Production Architecture (v3)
+
+```text
+  Users  (Admin / HoD / Faculty)
+             │  HTTPS
+             ▼
+┌───────────────────────────────┐
+│        Next.js Frontend       │  Vercel Edge Network / Docker + Nginx
+│  UI, SSR, middleware auth     │  SSG/SSR, TanStack Query, Recharts
+└──────────────┬────────────────┘
+               │  HTTPS (REST /api/v1)
+               ▼
+┌───────────────────────────────┐
+│       Express REST API        │  TypeScript, Docker, scaled >= 2
+│  modular services, Zod guard  │  Railway / AWS ECS / bare-metal
+└───────┬──────┬──────┬────┬────┘
+        │      │      │    │
+        ▼      ▼      ▼    ▼
+  ┌──────────┐ ┌────┐ ┌─────┐ ┌───────────┐
+  │PostgreSQL │ │Redis│ │Auth │ │  Storage  │
+  │(Supabase) │ │queue│ │ JWT │ │ Excel/PDF │
+  │ RLS, PITR │ │cache│ │RBAC │ │  reports  │
+  └──────────┘ └────┘ └─────┘ └───────────┘
+        │
+        ▼
+  ┌──────────────────────┐
+  │  Worker (BullMQ)     │  Async jobs: Excel import,
+  │  Node + Redis        │  report generation, exports
+  └──────────────────────┘
+```
+
+**Component breakdown**
+
+* **Frontend** — Next.js with Server Components for fast page loads and client components for interactive editors (CO-PO matrix, marks entry). State and server cache managed with TanStack Query; charts rendered with Recharts.
+* **Backend** — Modular Express API versioned under `/api/v1`. Each domain (programs, courses, assessments, attainment, reports) is a separate router + service. All inputs are validated with Zod before reaching the database.
+* **Database** — PostgreSQL 16 hosted on Supabase. Multi-tenant by `college → department → program` with Postgres Row-Level Security (RLS) enforced at the database level. Managed point-in-time backups and connection pooling via Supavisor.
+* **Authentication** — Supabase Auth issues short-lived JWTs. Roles (Admin / HoD / Faculty) are stored as custom claims and enforced by API middleware plus RLS.
+* **Storage** — Supabase Storage holds uploaded Excel/CSV files and generated report files (Excel/PDF), served behind signed URLs.
+* **Workers & Queue** — Heavy tasks (bulk Excel imports, report generation) run as BullMQ jobs on a dedicated worker using Redis as the broker, keeping the API responsive.
+* **Caching** — Redis (Upstash or self-hosted) caches frequently read data (CO-PO matrices, attainment dashboards) to cut database load.
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+| --- | --- | --- |
+| Frontend | Next.js 15 (App Router) | React framework, SSR/SSG, routing |
+| Language | TypeScript | Typed frontend and backend |
+| UI | Tailwind CSS, shadcn/ui | Styling and accessible components |
+| Client data | TanStack Query | Server state, caching, mutations |
+| Charts | Recharts | Attainment dashboards and analytics |
+| Backend | Node.js, Express | REST API under `/api/v1` |
+| Validation | Zod | Shared request/response schemas |
+| API security | Helmet, express-rate-limit | Secure headers and rate limiting |
+| Database | PostgreSQL 16 (Supabase) | Primary data store |
+| ORM | Prisma | Typed queries and migrations |
+| Auth | Supabase Auth | JWT authentication and RBAC |
+| Storage | Supabase Storage | Excel imports and report files |
+| Queue | BullMQ + Redis | Async import and report jobs |
+| Excel | SheetJS, ExcelJS | Import (CSV/XLSX), styled export |
+| Testing | Vitest | Unit tests (attainment engine) |
+| Lint / Format | ESLint, Prettier | Code quality |
+| CI/CD | GitHub Actions, Docker | Build, test, and auto-deploy |
+| Deployment | Vercel (web), Railway/AWS ECS (API) | Production hosting |
+| Observability | Sentry, Pino | Error tracking, structured logs |
+
+## Monorepo Structure
+
+```text
+obe-system/
+├── apps/
+│   ├── web/                  # Next.js frontend
+│   └── api/                  # Express backend (REST /api/v1)
+├── packages/
+│   └── shared/               # Zod schemas + shared TypeScript types
+├── workers/                  # BullMQ workers (Excel import, reports)
+├── prisma/                   # Database schema + migrations
+├── scripts/                  # Seed scripts + Excel import templates
+└── infra/                    # Dockerfiles, nginx config, CI workflows
+```
+
+## Security, Observability, CI/CD, and Backups
+
+* **Security** — HTTPS everywhere, short-lived JWTs, RBAC enforced at API and database level, Zod validation on every request, Helmet + rate limiting, secrets stored in environment variables / cloud vaults, full audit log of all data changes.
+* **Observability** — Structured logging with Pino, error tracking with Sentry, and API/dashboard metrics collected in dev, staging, and production.
+* **CI/CD** — GitHub Actions runs lint, typecheck, unit tests, and build on every push; on merge to `main` it runs Prisma migrations and auto-deploys the web app and API.
+* **Backups** — Supabase managed point-in-time recovery for PostgreSQL, plus scheduled `pg_dump` snapshots pushed to object storage; report files and uploads versioned in Supabase Storage.
+
+## Environments
+
+| Environment | Purpose | Notes |
+| --- | --- | --- |
+| **Local** | Development on laptops | Dockerized API + Next.js, Supabase local stack or shared dev project |
+| **Staging** | Pre-production testing | Mirrors production, separate Supabase project |
+| **Production** | Live deployment | Supabase project with PITR, scaled API replicas, CDN frontend |
+
+Key environment variables shared across environments: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `REDIS_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SENTRY_DSN`.
+
 ## Problem Statement
 
 In an Outcome-Based Education model, faculty members need to:
