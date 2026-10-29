@@ -6,6 +6,20 @@ The **Outcome-Based Education (OBE) Management System** is a web-based platform 
 
 Instead of focusing only on marks and grades, the system measures whether students are actually achieving the expected **Course Outcomes (COs)** and **Program Outcomes (POs)** defined for their courses and degree program.
 
+## Lab Sessions
+
+| Session | Topic | Deliverable |
+| --- | --- | --- |
+| 1 | Introduction to Software Engineering Tools | GitHub repository setup |
+| 2 | Problem Identification & Feasibility Analysis | [EX2README.md](EX2README.md) |
+| 3 | Requirements Engineering — Elicitation | [EX3README.md](EX3README.md) |
+| 4 | SRS Documentation | [EX4README.md](EX4README.md) |
+| 5 | UML Use Case Modeling | [EX5README.md](EX5README.md) |
+| 6 | UML Class Diagram Design | [EX6README.md](EX6README.md) |
+| 7 | UML Sequence and Activity Diagrams | [EX7README.md](EX7README.md) |
+| 8 | Software Design Principles | [EX8README.md](EX8README.md) |
+| 9 | Software Architecture and Design Patterns | [EX9README.md](EX9README.md) |
+
 ## Version Roadmap
 
 | Version | Scope | Status |
