@@ -42,7 +42,7 @@ The v1 constraint is important: the design must be **modular enough to evolve to
 | M6 | Analytics & Reporting | Dashboards, read models, exports, signed URLs | `Report`, read-model queries, exporter classes | `AnalyticsService`, `ReportService` |
 | M7 | Governance | Audit trail and domain-event notifications | `AuditLog`, event subscribers | `AuditService`, `NotificationService` |
 | M8 | Shared Kernel | Cross-cutting types, Zod schemas, error taxonomy, config | Shared package | Types, schemas, `AppError`, config loader |
-| M9 | Job Infrastructure | Queue connection, worker bootstrap, retry policy | BullMQ setup, job contracts | `enqueue()`, job processors |
+| M9 | Job Infrastructure | Queue connection, worker bootstrap, retry policy, and job entry points | BullMQ setup, job contracts, processors that invoke module services | `enqueue()`, job processors |
 
 ### 3.2 Module Dependency Diagram
 
@@ -103,6 +103,9 @@ flowchart TB
     M6 --> M8
     M7 --> M8
     M9 --> M8
+    M9 --> M4
+    M9 --> M5
+    M9 --> M6
 
     M1 --> DB
     M2 --> DB
@@ -118,7 +121,7 @@ flowchart TB
 
 ### 3.3 Dependency Rules
 
-1. **Downward dependencies only.** Presentation depends on API; API depends on domain services; domain services depend on the shared kernel and repository ports. No domain module imports from the web app.
+1. **Dependencies point inward.** Presentation depends on API; API and worker entry points depend on domain services; domain services depend on the shared kernel and repository ports. No domain module imports from the web app, a router, or a worker.
 2. **No cross-module table access.** M5 reads marks through M4's public read contract, not by querying M4's tables directly. M6 reads completed snapshots through M5's contract.
 3. **No cycles.** If M5 needs CO data, it depends on M3's interface; M3 must not depend on M5. Events are used where a reverse notification is needed.
 4. **Public surface per module.** Each module exposes an `index.ts` with services, DTOs, and events. Internal repositories and Prisma models stay private.
