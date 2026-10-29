@@ -99,16 +99,15 @@ flowchart LR
 
     UC12 -.->|includes| UC13
     UC12 -.->|includes| UC14
-    UC07 -.->|includes| UC05
-    UC07 -.->|includes| UC06
     UC08 -.->|extends| UC07
-    UC19 -.->|includes| UC15
 ```
 
 ### 3.1 Diagram notes
 
-- The dashed `includes` arrows show behaviour that is always part of the base use case: a calculation cannot complete without computing CO attainment and then rolling it up to POs; a CO-PO mapping cannot exist without COs and POs.
+- The dashed `includes` arrows show behaviour that is always part of the base use case: a calculation cannot complete without computing CO attainment and then rolling it up to POs.
 - `UC-08 Approve CO-PO mapping` **extends** `UC-07 Map COs to POs`: approval is an optional governance step triggered only when the department requires sign-off.
+- Defining COs (UC-05) and POs (UC-06) are **preconditions** for mapping, not included behaviour; mapping does not re-run outcome definition.
+- UC-19 reuses the analytics read model but is a distinct student-scoped use case, so it is not modelled as an include of UC-15.
 - `UC-12 Calculate attainment` and `UC-16 Generate and export report` delegate long-running work to the **Attainment Worker** so the API remains responsive.
 - Authentication is shown as a use case initiated by every human actor, but it is realized once by Supabase Auth and reused by all protected routes.
 
@@ -509,10 +508,10 @@ flowchart LR
 |---|---|---|---|
 | R-01 | UC-12 → UC-13 | `<<include>>` | A calculation request always computes CO attainment first |
 | R-02 | UC-12 → UC-14 | `<<include>>` | PO attainment is always derived from the CO results |
-| R-03 | UC-07 → UC-05 | `<<include>>` | Mapping cannot be performed without defined COs |
-| R-04 | UC-07 → UC-06 | `<<include>>` | Mapping cannot be performed without defined POs/PSOs |
+| R-03 | UC-05 → UC-07 | precondition | Mapping cannot be performed without defined COs |
+| R-04 | UC-06 → UC-07 | precondition | Mapping cannot be performed without defined POs/PSOs |
 | R-05 | UC-08 → UC-07 | `<<extend>>` | Approval is optional and department-policy driven |
-| R-06 | UC-19 → UC-15 | `<<include>>` | Student view reuses the analytics read model with a student scope |
+| R-06 | UC-15 ↔ UC-19 | shared read model | Student view reuses the analytics read model with a student scope |
 | R-07 | UC-16 → UC-12 | precondition | A report requires an attainment snapshot; running attainment is not silently triggered |
 
 ## 7. Traceability to the SRS and Flows
