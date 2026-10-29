@@ -142,6 +142,22 @@ flowchart LR
 
 ## 5. Detailed Use Case Narratives
 
+### 5.1 Template used
+
+| Field | Meaning |
+|---|---|
+| Use case ID / Name | Stable identifier and actor-facing goal |
+| Primary actor | The actor whose goal the use case satisfies |
+| Supporting actors | Systems or roles that help complete the goal |
+| Goal | The observable business outcome |
+| Preconditions | What must already be true before the trigger |
+| Trigger | The event that starts the use case |
+| Main success scenario | The happy path, one action per step |
+| Alternate / exception flows | Branches, validation failures, and recovery |
+| Postconditions | What is true after success (or safe failure) |
+| Business rules | Invariants and policy constraints |
+| Related requirements | Traceability to SRS requirement IDs |
+
 ### UC-01 — Authenticate and Authorize
 
 | Field | Detail |
