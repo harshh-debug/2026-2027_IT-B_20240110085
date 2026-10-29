@@ -19,7 +19,7 @@ The model covers the v1 scope (single IT department, local deployment) and delib
 | Actor | Type | Description | Primary goals |
 |---|---|---|---|
 | **Admin** | Primary | System/OBE-cell administrator with institution-wide access | Configure departments, programs, POs, users, and attainment policy; review audit logs |
-| **HoD** | Primary | Head of Department with department-scoped access | Manage department courses and faculty allocation, approve CO-PO mappings, monitor department attainment |
+| **HoD** | Primary | Head of Department with department-scoped access | Manage department users, courses, and faculty allocation; approve CO-PO mappings; monitor department attainment |
 | **Faculty** | Primary | Teacher assigned to one or more courses | Define COs, map COs to POs, create assessments, tag questions, enter marks, calculate attainment, export course reports |
 | **Student** | Primary | Student enrolled in a course | View own marks and personal CO/PO attainment |
 | **Attainment Worker** | Secondary (system) | BullMQ worker that executes heavy or scheduled jobs | Compute attainment, generate report files, send completion notifications |
@@ -73,12 +73,17 @@ flowchart LR
     Admin --> UC02
     Admin --> UC03
     Admin --> UC06
+    Admin --> UC15
+    Admin --> UC16
     Admin --> UC17
     Admin --> UC18
 
+    HoD --> UC02
+    HoD --> UC03
     HoD --> UC04
     HoD --> UC08
     HoD --> UC15
+    HoD --> UC16
 
     Faculty --> UC05
     Faculty --> UC07
@@ -116,8 +121,8 @@ flowchart LR
 | ID | Use case | Primary actor | Goal | Priority | Related module |
 |---|---|---|---|---|---|
 | UC-01 | Authenticate and authorize | All human actors | Establish a verified session with the correct role | Must | Auth & Users |
-| UC-02 | Manage users | Admin | Create, import, activate, or deactivate user accounts | Must | Auth & Users |
-| UC-03 | Manage departments and programs | Admin | Maintain the academic hierarchy | Must | Academic Structure |
+| UC-02 | Manage users | Admin; HoD (department-scoped) | Create, import, activate, or deactivate user accounts | Must | Auth & Users |
+| UC-03 | Manage departments and programs | Admin; HoD (department-scoped) | Maintain the academic hierarchy | Must | Academic Structure |
 | UC-04 | Manage courses and assign faculty | HoD | Create course offerings and allocate faculty | Must | Academic Structure |
 | UC-05 | Define course outcomes | Faculty | Write measurable COs for an assigned course | Must | OBE Modelling |
 | UC-06 | Define program outcomes | Admin | Maintain POs/PSOs for a program | Must | OBE Modelling |
@@ -130,7 +135,7 @@ flowchart LR
 | UC-13 | Compute CO attainment | System | Derive CO percentages from mapped marks and policy | Must | Attainment Engine |
 | UC-14 | Roll up PO attainment | System | Weighted roll-up of CO attainment to POs | Must | Attainment Engine |
 | UC-15 | View analytics dashboard | Faculty, HoD, Admin | Inspect course/department attainment trends | Should | Analytics & Reporting |
-| UC-16 | Generate and export report | Faculty, HoD | Produce Excel/PDF attainment reports | Must | Analytics & Reporting |
+| UC-16 | Generate and export report | Faculty, HoD, Admin | Produce Excel/PDF attainment reports | Must | Analytics & Reporting |
 | UC-17 | Configure attainment policy | Admin | Set target %, threshold %, and CIE/ESE weights | Must | OBE Configuration |
 | UC-18 | Review audit log | Admin | Inspect data-changing operations for compliance | Should | Governance |
 | UC-19 | View own attainment | Student | See personal marks and CO/PO attainment | Should | Analytics & Reporting |
@@ -236,7 +241,7 @@ flowchart LR
 | **Use case ID** | UC-07 |
 | **Name** | Map COs to POs |
 | **Primary actor** | Faculty |
-| **Supporting actors** | HoD (approval via UC-08) |
+| **Supporting actors** | HoD (approval via UC-08); Admin (conflict approval) |
 | **Goal** | Each CO is linked to one or more POs with a defensible weight |
 | **Preconditions** | The course has COs (UC-05); the program has POs/PSOs (UC-06); the faculty member is assigned to the course |
 | **Trigger** | Faculty opens **Course → CO-PO Matrix** |
