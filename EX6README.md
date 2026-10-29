@@ -166,6 +166,22 @@ classDiagram
         +isValid(maxMarks) Boolean
     }
 
+    class ImportJob {
+        +UUID id
+        +UUID assessmentId
+        +UUID uploadedBy
+        +String filePath
+        +ImportStatus status
+        +Int rowCount
+        +Int errorCount
+        +String errorReportUrl
+        +DateTime createdAt
+        +DateTime completedAt
+        +markProcessing() void
+        +markCompleted() void
+        +markFailed(errors) void
+    }
+
     class AttainmentPolicy {
         +UUID id
         +String name
@@ -288,6 +304,13 @@ classDiagram
         MARKS_COMPLETE
         LOCKED
     }
+    class ImportStatus {
+        <<enumeration>>
+        QUEUED
+        PROCESSING
+        COMPLETED
+        FAILED
+    }
     class EnrollmentStatus {
         <<enumeration>>
         ACTIVE
@@ -348,6 +371,7 @@ classDiagram
     Course "1" *-- "*" CourseOutcome : defines
     Course "1" *-- "*" Assessment : contains
     Assessment "1" *-- "*" Question : contains
+    Assessment "1" --> "*" ImportJob : receives
 
     COPOMapping "*" --> "1" CourseOutcome : links
     COPOMapping "*" --> "1" ProgramOutcome : links
@@ -373,6 +397,7 @@ classDiagram
     Student "1" --> "*" StudentCOAttainment : receives
 
     User "1" --> "*" Report : requests
+    User "1" --> "*" ImportJob : uploads
     AttainmentSnapshot "1" --> "*" Report : supplies
     User "1" --> "*" AuditLog : generates
 ```
@@ -409,6 +434,7 @@ classDiagram
 | **Question** | Individual item in an assessment | `number`, `maxMarks`, `assessmentId` | `mapToCO()` | UC-10 |
 | **QuestionCOMapping** | Tags a question to one or more COs | `questionId`, `courseOutcomeId`, `share` | — | UC-10, UC-12 |
 | **Mark** | Score obtained by a student on a question | `studentId`, `questionId`, `obtainedMarks`, `enteredBy` | `isValid()` | UC-11, UC-12 |
+| **ImportJob** | Tracks one bulk marks-import request and its row-level outcome | `assessmentId`, `uploadedBy`, `status`, `rowCount`, `errorReportUrl` | `markProcessing()`, `markCompleted()`, `markFailed()` | UC-11 |
 
 ### 3.4 Attainment and Reporting
 
@@ -438,6 +464,8 @@ classDiagram
 | `Student ↔ Course` | Many-to-many via `Enrollment` | * : * | Enrollment carries semester and status; it also scopes which marks are valid. |
 | `Student → Mark` | Association | 1 : * | A student receives many marks. |
 | `Question → Mark` | Association | 1 : * | A question accumulates one mark per student. |
+| `Assessment → ImportJob` | Association | 1 : * | An assessment can be imported multiple times; each request keeps its own status and error report. |
+| `User → ImportJob` | Association | 1 : * | Every import is attributable to the faculty member who uploaded it. |
 | `Course → AttainmentSnapshot` | Association | 1 : * | Multiple historical snapshots preserve reproducibility. |
 | `AttainmentPolicy → AttainmentSnapshot` | Association | 1 : * | Every snapshot records the exact policy used. |
 | `AttainmentSnapshot → COAttainment` | Composition | 1 : * | Course-level CO results are owned by one snapshot and are immutable. |
@@ -520,7 +548,7 @@ Course-level CO, student-level CO, and PO percentages are **stored** inside snap
 | UC-08 Approve mapping | `COPOMapping`, `HoD`, `AuditLog` |
 | UC-09 Create assessment | `Course`, `Assessment` |
 | UC-10 Map questions to COs | `Question`, `CourseOutcome`, `QuestionCOMapping` |
-| UC-11 Record/import marks | `Enrollment`, `Mark`, `Assessment`, `Question` |
+| UC-11 Record/import marks | `Enrollment`, `Mark`, `Assessment`, `Question`, `ImportJob` |
 | UC-12 Calculate attainment | `AttainmentSnapshot`, `COAttainment`, `StudentCOAttainment`, `POAttainment`, `AttainmentPolicy` |
 | UC-15 View analytics | `AttainmentSnapshot`, `COAttainment`, `POAttainment` |
 | UC-16 Export report | `Report`, `AttainmentSnapshot` |
@@ -544,6 +572,7 @@ Course-level CO, student-level CO, and PO percentages are **stored** inside snap
 | `QuestionCOMapping` | `question_co_mappings` | Unique `(question_id, course_outcome_id)` |
 | `Enrollment` | `enrollments` | Unique `(student_id, course_id, semester)` |
 | `Mark` | `marks` | Unique `(student_id, question_id)` |
+| `ImportJob` | `import_jobs` | Status machine; stores source path and error report |
 | `AttainmentPolicy` | `attainment_policies` | Only one active policy per scope |
 | `AttainmentSnapshot` | `attainment_snapshots` | Immutable after completion |
 | `COAttainment` | `co_attainments` | FK `snapshot_id`, `course_outcome_id` |
