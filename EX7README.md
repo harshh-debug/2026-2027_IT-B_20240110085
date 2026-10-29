@@ -46,8 +46,7 @@ sequenceDiagram
             WEB-->>U: Redirect to role landing page
         else Route allowed
             WEB->>API: GET /api/v1/resource (Bearer JWT)
-            API->>AUTH: Verify JWT signature and claims
-            AUTH-->>API: Valid token, role, department_id
+            API->>API: Verify JWT signature and claims locally
             API->>DB: Query with role/department session context
             DB->>DB: Apply Row-Level Security policy
             DB-->>API: Only permitted rows
