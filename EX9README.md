@@ -44,12 +44,12 @@ flowchart TB
     USERS --> BROWSER
     BROWSER -->|HTTPS| WEB
     WEB -->|REST /api/v1| API
-    WEB --> AUTH
-    API --> AUTH
+    WEB -->|sign in| AUTH
+    API -->|JWKS / user admin| AUTH
     API --> DB
     API --> CACHE
     API --> STORAGE
-    CACHE --> WORKER
+    CACHE <-->|jobs / cache| WORKER
     WORKER --> DB
     WORKER --> STORAGE
     WORKER --> MAIL
