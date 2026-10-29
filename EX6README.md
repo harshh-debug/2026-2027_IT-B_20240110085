@@ -339,11 +339,13 @@ classDiagram
     Course "1" *-- "*" Assessment : contains
     Assessment "1" *-- "*" Question : contains
 
-    CourseOutcome "*" --> "*" ProgramOutcome : mapped by
     COPOMapping "*" --> "1" CourseOutcome : links
     COPOMapping "*" --> "1" ProgramOutcome : links
     QuestionCOMapping "*" --> "1" Question : tags
     QuestionCOMapping "*" --> "1" CourseOutcome : tags
+
+    note for COPOMapping "Association class linking CourseOutcome and ProgramOutcome"
+    note for QuestionCOMapping "Association class linking Question and CourseOutcome"
 
     Student "1" --> "*" Enrollment : registers
     Course "1" --> "*" Enrollment : has
