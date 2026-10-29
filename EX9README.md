@@ -95,12 +95,15 @@ flowchart TB
         READMODEL["Query/read models<br/>dashboards · analytics"]
     end
 
-    subgraph L6["6 · Infrastructure Layer"]
+    subgraph L6["6 · Infrastructure Layer (driven adapters)"]
         PG[("PostgreSQL 16<br/>RLS · migrations")]
         REDIS[("Redis<br/>cache · queue")]
         SUPABASE["Supabase Auth / Storage"]
-        JOBS["BullMQ worker<br/>job processors"]
         OBS["Pino / Sentry<br/>logs · errors"]
+    end
+
+    subgraph DRIVER["Entry-point adapters"]
+        JOBS["BullMQ worker process<br/>job processors"]
     end
 
     UI --> MW
@@ -116,8 +119,8 @@ flowchart TB
     READMODEL --> PG
     SERVICES --> REDIS
     SERVICES --> SUPABASE
-    EVENTS --> JOBS
-    JOBS --> REPOS
+    EVENTS -->|enqueue via port| JOBS
+    JOBS -->|invokes use cases| SERVICES
     JOBS --> REDIS
     JOBS --> SUPABASE
     UI --> OBS
@@ -135,7 +138,7 @@ flowchart TB
 | **Application / Service** | Use-case orchestration, transactions, job enqueueing, authorization decisions | SQL, Express `req`/`res`, UI concerns | Depends on domain + repository ports |
 | **Domain** | Invariants, state transitions, calculation policies | Framework code, I/O, logging infrastructure | Depends on nothing external |
 | **Data Access** | Persistence mapping, queries, read models | Business decisions, HTTP concerns | Implements ports used by services |
-| **Infrastructure** | PostgreSQL, Redis, Supabase, workers, observability | Domain rules | Pluggable behind adapters |
+| **Infrastructure** | PostgreSQL, Redis, Supabase, observability (driven adapters); worker process as an entry-point adapter | Domain rules | Pluggable behind ports; the worker invokes application services, never the reverse |
 
 ### 3.2 Layer interaction example
 
@@ -143,7 +146,7 @@ A marks save flows strictly downward:
 
 `MarksGrid (L1) → PUT /marks (L2) → Zod + RBAC (L2) → MarksService (L3) → Mark/CourseOutcome invariants (L4) → MarkRepository (L5) → PostgreSQL (L6)`
 
-No layer reaches upward. The worker uses the same L3–L5 services, which is why the calculation never forks into a second implementation.
+Static dependencies point inward: domain code knows no framework, application services depend on domain and ports, and driven adapters implement those ports. The HTTP router and the worker are **entry-point adapters**; both invoke the same L3 services, which is why the calculation never forks into a second implementation. There is no dependency from a domain service back into a worker or an HTTP controller.
 
 ## 4. Client-Server Architecture
 
@@ -315,6 +318,7 @@ For v1, none of these justify distributed transactions. The attainment engine an
 | Pattern | Problem it solves | Application in OBE | Benefits | Trade-offs |
 |---|---|---|---|---|
 | **Layered Architecture** | Mixing UI, business rules, and persistence | Six layers from presentation to infrastructure | Clear responsibilities; testable domain | Pass-through layers if boundaries are not enforced |
+| **Ports and Adapters (Hexagonal)** | Domain must not depend on Prisma, Redis, or vendor SDKs | Repository, queue, storage, and auth ports with infrastructure adapters; HTTP and worker are entry-point adapters | Domain is framework-free and testable; vendors are replaceable | More interfaces and mapping code |
 | **Modular Monolith** | Microservices would be too costly for a small team | Module boundaries M0–M9 inside one deployable API | Simple operations; strong transactions; future extraction path | Requires discipline to prevent a big ball of mud |
 | **Client-Server** | Shared UI logic and data access | Next.js client/server + REST API + database | Central authorization and data integrity | Network latency; API contract maintenance |
 | **BFF (Backend-for-Frontend)** | Browser needs role-aware, page-shaped data | Next.js server components read cookies and call the API | Smaller payloads; secrets stay server-side | Extra server hop; duplicated view logic if not careful |
