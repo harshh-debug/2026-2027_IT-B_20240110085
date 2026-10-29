@@ -56,7 +56,7 @@ classDiagram
     class Student {
         +String rollNo
         +UUID programId
-        +viewOwnAttainment(courseId) COAttainment[]
+        +viewOwnAttainment(courseId) StudentCOAttainment[]
     }
 
     class Department {
@@ -116,6 +116,7 @@ classDiagram
         +MappingStatus status
         +UUID approvedBy
         +DateTime approvedAt
+        +String decisionComment
         +approve(approverId) void
         +reject(comment) void
     }
@@ -197,6 +198,15 @@ classDiagram
         +Float averageScore
         +Int studentsAboveThreshold
         +Int totalStudents
+        +AttainmentStatus status
+    }
+
+    class StudentCOAttainment {
+        +UUID id
+        +UUID snapshotId
+        +UUID studentId
+        +UUID courseOutcomeId
+        +Float percent
         +AttainmentStatus status
     }
 
@@ -355,9 +365,12 @@ classDiagram
     Course "1" --> "*" AttainmentSnapshot : produces
     AttainmentPolicy "1" --> "*" AttainmentSnapshot : governs
     AttainmentSnapshot "1" *-- "*" COAttainment : contains
+    AttainmentSnapshot "1" *-- "*" StudentCOAttainment : contains
     AttainmentSnapshot "1" *-- "*" POAttainment : contains
     COAttainment "*" --> "1" CourseOutcome : measures
+    StudentCOAttainment "*" --> "1" CourseOutcome : measures
     POAttainment "*" --> "1" ProgramOutcome : aggregates
+    Student "1" --> "*" StudentCOAttainment : receives
 
     User "1" --> "*" Report : requests
     AttainmentSnapshot "1" --> "*" Report : supplies
@@ -403,7 +416,8 @@ classDiagram
 |---|---|---|---|---|
 | **AttainmentPolicy** | Configurable calculation rules | `method`, `targetPercent`, `thresholdPercent`, `cieWeight`, `eseWeight` | — | UC-12, UC-17 |
 | **AttainmentSnapshot** | Immutable result of one calculation run | `courseId`, `policyId`, `mappingVersion`, `calculatedAt`, `status` | `coResults()`, `poResults()` | UC-12, UC-15, UC-16 |
-| **COAttainment** | Per-CO result inside a snapshot | `percent`, `averageScore`, `studentsAboveThreshold` | — | UC-12, UC-15, UC-19 |
+| **COAttainment** | Per-CO result inside a snapshot | `percent`, `averageScore`, `studentsAboveThreshold` | — | UC-12, UC-15 |
+| **StudentCOAttainment** | Per-student, per-CO result inside a snapshot | `snapshotId`, `studentId`, `courseOutcomeId`, `percent`, `status` | — | UC-12, UC-19 |
 | **POAttainment** | Per-PO roll-up inside a snapshot | `percent`, `weightedDenominator`, `status` | — | UC-12, UC-15 |
 | **Report** | Asynchronous export request and file metadata | `type`, `scope`, `format`, `status`, `fileUrl` | `markReady()`, `markFailed()` | UC-16 |
 | **AuditLog** | Append-only record of data changes | `userId`, `action`, `entityType`, `before`, `after` | — | UC-01, UC-08, UC-18 |
@@ -426,8 +440,10 @@ classDiagram
 | `Question → Mark` | Association | 1 : * | A question accumulates one mark per student. |
 | `Course → AttainmentSnapshot` | Association | 1 : * | Multiple historical snapshots preserve reproducibility. |
 | `AttainmentPolicy → AttainmentSnapshot` | Association | 1 : * | Every snapshot records the exact policy used. |
-| `AttainmentSnapshot → COAttainment` | Composition | 1 : * | CO results are owned by one snapshot and are immutable. |
+| `AttainmentSnapshot → COAttainment` | Composition | 1 : * | Course-level CO results are owned by one snapshot and are immutable. |
+| `AttainmentSnapshot → StudentCOAttainment` | Composition | 1 : * | Student-level results are stored with the same snapshot so students can view their own attainment without recalculation. |
 | `AttainmentSnapshot → POAttainment` | Composition | 1 : * | PO results are derived and stored with their snapshot. |
+| `Student → StudentCOAttainment` | Association | 1 : * | A student receives one personal result per CO in a published snapshot. |
 | `User → Report` | Association | 1 : * | Reports are requested by a user and must remain traceable. |
 | `AttainmentSnapshot → Report` | Association | 1 : * | A report always cites the snapshot it was rendered from. |
 | `User → AuditLog` | Association | 1 : * | Every changing action is attributable to a user. |
@@ -464,7 +480,7 @@ This makes reports defensible even after COs, mappings, or policies change. It a
 
 ### 5.4 Derived vs stored data
 
-CO and PO percentages are **stored** inside snapshots rather than computed on every dashboard read. This is a deliberate performance decision (NFR-PERF-01) and allows historical comparison. The live calculation logic remains in the domain service, not in the entity.
+Course-level CO, student-level CO, and PO percentages are **stored** inside snapshots rather than computed on every dashboard read. This is a deliberate performance decision (NFR-PERF-01) and allows historical comparison. The live calculation logic remains in the domain service, not in the entity.
 
 ### 5.5 Nullable marks are meaningful
 
@@ -484,6 +500,7 @@ CO and PO percentages are **stored** inside snapshots rather than computed on ev
 | INV-04 | A student can have at most one mark per question | Unique `(studentId, questionId)` |
 | INV-05 | A student can be enrolled only once per course offering | Unique `(studentId, courseId, semester)` |
 | INV-06 | An attainment snapshot is immutable after completion | Service layer disallows updates; new runs create new snapshots |
+| INV-06a | A student has at most one result per CO in a snapshot | Unique `(snapshotId, studentId, courseOutcomeId)` |
 | INV-07 | PO attainment uses the sum of mapping weights as denominator | Attainment engine + tests |
 | INV-08 | An approved mapping cannot be edited without a new approval cycle | `COPOMapping.status` state machine |
 | INV-09 | A user cannot approve their own mapping | Authorization rule in the approval service |
@@ -504,12 +521,12 @@ CO and PO percentages are **stored** inside snapshots rather than computed on ev
 | UC-09 Create assessment | `Course`, `Assessment` |
 | UC-10 Map questions to COs | `Question`, `CourseOutcome`, `QuestionCOMapping` |
 | UC-11 Record/import marks | `Enrollment`, `Mark`, `Assessment`, `Question` |
-| UC-12 Calculate attainment | `AttainmentSnapshot`, `COAttainment`, `POAttainment`, `AttainmentPolicy` |
+| UC-12 Calculate attainment | `AttainmentSnapshot`, `COAttainment`, `StudentCOAttainment`, `POAttainment`, `AttainmentPolicy` |
 | UC-15 View analytics | `AttainmentSnapshot`, `COAttainment`, `POAttainment` |
 | UC-16 Export report | `Report`, `AttainmentSnapshot` |
 | UC-17 Configure policy | `AttainmentPolicy`, `Admin` |
 | UC-18 Review audit log | `AuditLog`, `Admin` |
-| UC-19 View own attainment | `Student`, `Enrollment`, `COAttainment` |
+| UC-19 View own attainment | `Student`, `Enrollment`, `StudentCOAttainment` |
 
 ## 8. Mapping to the Physical Schema
 
@@ -530,6 +547,7 @@ CO and PO percentages are **stored** inside snapshots rather than computed on ev
 | `AttainmentPolicy` | `attainment_policies` | Only one active policy per scope |
 | `AttainmentSnapshot` | `attainment_snapshots` | Immutable after completion |
 | `COAttainment` | `co_attainments` | FK `snapshot_id`, `course_outcome_id` |
+| `StudentCOAttainment` | `student_co_attainments` | Unique `(snapshot_id, student_id, course_outcome_id)` |
 | `POAttainment` | `po_attainments` | FK `snapshot_id`, `program_outcome_id` |
 | `Report` | `reports` | Status machine + signed URL metadata |
 | `AuditLog` | `audit_logs` | Append-only, indexed by `entity_type`, `entity_id`, `timestamp` |
@@ -541,3 +559,4 @@ CO and PO percentages are **stored** inside snapshots rather than computed on ev
 - CO-PO approval is configurable and can be disabled for a department that does not require it.
 - Student self-registration does not exist; `Student` rows are provisioned by Admin import.
 - The model does not include notification preferences or announcement classes; those are outside the v1 scope.
+- Student-level PO attainment across the whole program is a v2 read-model. v1 stores per-course `StudentCOAttainment`; course-level PO attainment is available from the snapshot, and a student's programme-wide PO view is derived on read when that feature is enabled.
