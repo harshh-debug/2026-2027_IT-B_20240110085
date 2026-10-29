@@ -209,6 +209,7 @@ sequenceDiagram
         W->>W: Roll up PO attainment by mapping weight
         W->>DB: BEGIN
         W->>DB: INSERT co_attainments
+        W->>DB: INSERT student_co_attainments
         W->>DB: INSERT po_attainments
         W->>DB: UPDATE snapshot COMPLETED
         W->>DB: INSERT audit_logs
@@ -296,7 +297,7 @@ sequenceDiagram
         API-->>WEB: 200 OK + pending state
         WEB-->>S: Show "results pending"
     else Published results exist
-        DB-->>API: Own marks, CO attainment, PO summary
+        DB-->>API: Own marks, student CO attainment, course PO summary
         API-->>WEB: 200 OK + student-scoped JSON
         WEB-->>S: Render personal attainment view
     end
